@@ -1,2 +1,5 @@
-/Code/Tutorial_code
+.idea
+/Code/Tutorial_code/
 /Outputs/Tutorial/
+/Dataset/test_data/
+/Dataset/train_data/
