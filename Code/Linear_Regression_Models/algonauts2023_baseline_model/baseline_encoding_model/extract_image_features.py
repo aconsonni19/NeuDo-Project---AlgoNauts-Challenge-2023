@@ -127,7 +127,7 @@ def extract_features(sub, project_dir, output_dir):
         image_list = os.listdir(os.path.join(img_set_dir, splits_parent[s], 'subj' +
                                              format(sub, '02'), splits[s], splits_child[s]))
         image_list.sort()
-        print("Extracting features from " + splits_parent[s] + f'f in batches of {batch_size}')
+        print("Extracting features from " + splits_parent[s] + f' in batches of {batch_size}')
 
         # Extract the feature maps from batch:
         for i in range(0, len(image_list), batch_size):
@@ -205,6 +205,7 @@ def extract_features(sub, project_dir, output_dir):
     if os.path.isdir(save_dir) == False:
         os.makedirs(save_dir)
 
+    print("Saving downsampled features...")
     i = 0 # Initialize counter
     for batch_file in tqdm(fmaps_train):
         batch_data = np.load(batch_file) # Load batch data
