@@ -27,8 +27,11 @@ def use_algonauts_model(project_dir, output_dir):
         os.makedirs(local_baseline_encoding_dir)
 
     for sub in range (1, 9):
-       #baseline_encoding_extract_features(sub, project_dir, local_baseline_encoding_dir) # Extract features
-        baseline_encoding_train_encoding_model(sub, project_dir, output_dir) # Train model
+        # baseline_encoding_extract_features(sub, project_dir, local_baseline_encoding_dir) # Extract features
+        baseline_encoding_train_encoding_model(sub, project_dir, output_dir) # Train model on both brain hemispheres
+
+
+
 
 
 
