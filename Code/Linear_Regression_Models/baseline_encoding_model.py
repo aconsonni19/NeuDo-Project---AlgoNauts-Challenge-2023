@@ -415,9 +415,11 @@ def baseline_encoding_test_model(sub, project_dir, output_dir):
 
     np.save(os.path.join(save_dir, file_name), encoding_accuracy)
 
-# ===================================================================================================
+# ======================================================================================================
 # Algorithm to plot the encoding models noise-ceiling-normalized encoding accuracy on a brain surface
-# ====================================================================================================
+# WARNING: This algorithm DOES NOT WORK ON WINDOWS because it uses packages only available on Linux/MacOS
+# please use a UNIX machine to run it
+# ======================================================================================================
 
 def baseline_encoding_plot_results(subjects, project_dir, output_dir):
     print('>>> Algonauts 2023 plot encoding accuracy for all subjects <<<')
