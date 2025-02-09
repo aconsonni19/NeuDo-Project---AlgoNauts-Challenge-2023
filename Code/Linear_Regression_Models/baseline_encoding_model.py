@@ -12,9 +12,11 @@ project_dir_dir : str
 
 import argparse
 import gc
+import glob
 import random
 
 import joblib
+from sklearn.linear_model import LinearRegression
 from torchvision import models
 import torch.nn as nn
 import numpy as np
@@ -26,7 +28,6 @@ from PIL import Image
 from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, IncrementalPCA
-
 
 # =============================================================================
 # Definition of AlexNet model
@@ -66,13 +67,11 @@ class AlexNet(nn.Module):
                 features.append(x)
         return features
 
+# =============================================================================
+# Algorithm to extract features using AlexNet
+# =============================================================================
 
-
-def extract_features(sub, project_dir, output_dir):
-    # =============================================================================
-    # Input arguments
-    # =============================================================================
-
+def baseline_encoding_extract_features(sub, project_dir, output_dir):
     print('>>> Algonauts 2023 extract image features <<<')
     print(f'Project directory: {project_dir}')
     print(f'Output directory: {output_dir}')
@@ -236,3 +235,70 @@ def extract_features(sub, project_dir, output_dir):
         np.save(os.path.join(save_dir, f'test_data_batch_features_pca_{i}'), batch_data_pca)
         i += 1
     del fmaps_test  # Free computing resources
+
+def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
+    print('>>> Algonauts 2023 train encoding <<<')
+    print('\nInput arguments:')
+    print(f'\n Using subject: {sub}')
+    print(f'\n Project directory: {project_dir}')
+
+    # =============================================================================
+    # Load the DNN feature maps
+    # =============================================================================
+    baseline_encoding_dir = os.path.join(output_dir, 'baseline_encoding_model')
+
+    # Load training PCA reduced maps
+    dnn_dir = os.path.join(baseline_encoding_dir, 'dnn_feature_maps','subj' + format(sub, '02'))
+    train_batch_files = sorted(glob.glob(os.path.join(dnn_dir, 'train_data', 'train_data_batch_features_pca_*.npy')))
+
+    # Concatenate all PCA-reduced batches
+    X_train_batches = [np.load(f) for f in train_batch_files]
+    X_train = np.concatenate(X_train_batches, axis=0)
+
+    # Load test PCA reduced maps
+    test_batch_files = sorted(glob.glob(os.path.join(dnn_dir, 'test_data', 'test_data_batch_features_pca_*.npy')))
+    X_test_batches = [np.load(f) for f in test_batch_files]
+    X_test = np.concatenate(X_test_batches, axis=0)
+
+    # =============================================================================
+    # Load the fMRI data
+    # =============================================================================
+
+    data_dir = os.path.join(project_dir, 'Dataset', 'train_data',
+                            'subj' + format(sub, '02'),
+                            'training_split', 'training_fmri')
+    y_train_lh = np.load(os.path.join(data_dir, 'lh_training_fmri.npy'))
+    y_train_rh = np.load(os.path.join(data_dir, 'rh_training_fmri.npy'))
+
+    # =============================================================================
+    # Train the linear regression and save the predicted fMRI for the test images
+    # =============================================================================
+
+    # Empty synthetic fMRI data matrices of shape:
+    # (Test image conditions × fMRI vertices)
+
+    synt_test_lh = np.zeros((X_test.shape[0], y_train_lh.shape[1]))
+    synt_test_rh = np.zeros((X_test.shape[0], y_train_rh.shape[1]))
+
+    # Independently for each fMRI vertex, fit a linear regression using the
+    # training image conditions and use it to synthesize the fMRI responses of the
+    # test image conditions
+    for v in tqdm(range(y_train_lh.shape[1])):
+        reg_lh = LinearRegression().fit(X_train, y_train_lh[:, v])
+        synt_test_lh[:, v] = reg_lh.predict(X_test)
+    for v in tqdm(range(y_train_rh.shape[1])):
+        reg_rh = LinearRegression().fit(X_train, y_train_rh[:, v])
+        synt_test_rh[:, v] = reg_rh.predict(X_test)
+
+    # Save the synthetic fMRI test data
+    save_dir = os.path.join(baseline_encoding_dir, 'synthetic_data', 'subj' + format(sub, '02'))
+    if os.path.isdir(save_dir) == False:
+        os.makedirs(save_dir)
+    np.save(os.path.join(save_dir, 'lh_test_synthetic_fmri.npy'), synt_test_lh)
+    np.save(os.path.join(save_dir, 'rh_test_synthetic_fmri.npy'), synt_test_rh)
+
+
+
+
+
+
