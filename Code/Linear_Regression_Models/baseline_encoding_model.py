@@ -236,6 +236,10 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
         i += 1
     del fmaps_test  # Free computing resources
 
+# =============================================================================
+# Algorithm to train the linear regressor on both brain hemisphere
+# =============================================================================
+
 def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
     print('>>> Algonauts 2023 train encoding <<<')
     print('\nInput arguments:')
@@ -274,7 +278,7 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
     # Train the linear regression and save the predicted fMRI for the test images
     # =============================================================================
 
-    # Empty synthetic fMRI data matrices of shape:
+    # Create empty synthetic fMRI data matrices of dimension
     # (Test image conditions × fMRI vertices)
 
     synt_test_lh = np.zeros((X_test.shape[0], y_train_lh.shape[1]))
@@ -284,10 +288,18 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
     # training image conditions and use it to synthesize the fMRI responses of the
     # test image conditions
     for v in tqdm(range(y_train_lh.shape[1])):
+        # Fit linear regression model using the training image conditions (X_train) and the
+        # fMRI responses for vertex v in the LEFT hemisphere
         reg_lh = LinearRegression().fit(X_train, y_train_lh[:, v])
+        # Uses the fitted model to predict fMRI responses for the test image conditions
+        # (X_test) and store the prediction in the corresponding column
         synt_test_lh[:, v] = reg_lh.predict(X_test)
     for v in tqdm(range(y_train_rh.shape[1])):
+        # Fit linear regression model using the training image conditions (X_train) and the
+        # fMRI responses for vertex v in the RIGHT hemisphere
         reg_rh = LinearRegression().fit(X_train, y_train_rh[:, v])
+        # Uses the fitted model to predict fMRI responses for the test image conditions
+        # (X_test) and store the prediction in the corresponding column
         synt_test_rh[:, v] = reg_rh.predict(X_test)
 
     # Save the synthetic fMRI test data
@@ -296,6 +308,9 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
         os.makedirs(save_dir)
     np.save(os.path.join(save_dir, 'lh_test_synthetic_fmri.npy'), synt_test_lh)
     np.save(os.path.join(save_dir, 'rh_test_synthetic_fmri.npy'), synt_test_rh)
+
+
+
 
 
 
