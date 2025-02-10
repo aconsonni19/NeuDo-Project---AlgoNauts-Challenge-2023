@@ -1,9 +1,9 @@
 # ================================================================================================
-# Python module to call the various linear regression models contained in Linear_Regression_Models
+# Python module to call the various linear regression models contained in Linear_Regression_Model
 # ================================================================================================
 import os.path
 
-from Code.Linear_Regression_Models.baseline_encoding_model import \
+from Code.Linear_Regression_Model.baseline_encoding_model import \
     (baseline_encoding_extract_features, baseline_encoding_train_encoding_model, baseline_encoding_test_model,
      baseline_encoding_accuracy_plot, baseline_encoding_plot_roi_correlation, baseline_encoding_accuracy_plot_fsavarage)
 
