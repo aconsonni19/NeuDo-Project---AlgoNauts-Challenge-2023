@@ -14,6 +14,8 @@ import argparse
 import gc
 import glob
 import random
+import sys
+from copy import copy
 
 import joblib
 from matplotlib import pyplot as plt
@@ -30,8 +32,7 @@ from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import IncrementalPCA
 from scipy.stats import pearsonr
-from copy import copy
-import cortex
+
 
 # =============================================================================
 # Definition of AlexNet model
@@ -76,6 +77,16 @@ class AlexNet(nn.Module):
 # =============================================================================
 
 def baseline_encoding_extract_features(sub, project_dir, output_dir):
+    """
+    Extracts the features from the Dataset Images
+    :param sub: The subject used
+    :param project_dir: The project directory where the Dataset is contained
+    :param output_dir: The output directory
+    :return:
+    """
+    # =============================================================================
+    # Setup of the enviorment
+    # =============================================================================
     print('>>> Algonauts 2023 extract image features <<<')
     print(f'Project directory: {project_dir}')
     print(f'Output directory: {output_dir}')
@@ -100,10 +111,7 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
         model.cuda()
     model.eval()
 
-
-    # =============================================================================
     # Define the image preprocessing
-    # =============================================================================
     centre_crop = trn.Compose([
         trn.Resize((224,224)),
         trn.ToTensor(),
@@ -245,6 +253,15 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
 # =============================================================================
 
 def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
+    """
+    Train the linear regression model using the features extracted from the dataset
+    :param sub: The subject used
+    :param project_dir: The project directory where the Dataset is contained
+    :param output_dir: The project Output directory, where the Outputs of the model are contained
+    :return:
+    """
+
+
     print('>>> Algonauts 2023 train encoding <<<')
     print('\nInput arguments:')
     print(f'\n Using subject: {sub}')
@@ -320,6 +337,13 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
 # =============================================================================
 
 def baseline_encoding_test_model(sub, project_dir, output_dir):
+    """
+    Test the linear regression model using the test split of the dataset
+    :param sub: The subject used; determines which linear regressor will be used
+    :param project_dir: The project directory where the Dataset is contained
+    :param output_dir: The project Output directory, where the Outputs of the model are contained
+    :return:
+    """
     print('>>> Algonauts 2023 test encoding <<<')
     print(f'Subject used: {sub}')
     print(f'Project directory: {project_dir}')
@@ -415,91 +439,259 @@ def baseline_encoding_test_model(sub, project_dir, output_dir):
 
     np.save(os.path.join(save_dir, file_name), encoding_accuracy)
 
+    # Returns the pearson correlation in a dictionary in order to use them to plot results
+    # NOTE: Maybe save this also as a numpy file
+    model_correlations = {
+        'lh_pearson_correlations': lh_correlation,
+        'rh_pearson_correlations': rh_correlation,
+    }
+
+    return model_correlations
+
 # ======================================================================================================
-# Algorithm to plot the encoding models noise-ceiling-normalized encoding accuracy on a brain surface
-# WARNING: This algorithm DOES NOT WORK ON WINDOWS because it uses packages only available on Linux/MacOS
-# please use a UNIX machine to run it
+# Algorithm to plot the encoding model R^2 accuracy score for each emisphere in challenge space
 # ======================================================================================================
 
-def baseline_encoding_plot_results(subjects, project_dir, output_dir):
-    print('>>> Algonauts 2023 plot encoding accuracy for all subjects <<<')
-    print(f"Project diretory: {project_dir}")
+def baseline_encoding_accuracy_plot(sub, project_dir, output_dir):
+    """
+    Plots the mean encoding accuracy for both hemispheres in a barplot
+    :param sub: The subject for which the results will be plotted
+    :param project_dir: The project directory
+    :param output_dir: The project outputs directory
+    :return:
+    """
+    print(f'>>> Algonauts 2023 Bar Plot of Encoding Accuracy (R^2 Scores) for Subject {sub} <<<')
+    print(f"Project directory: {project_dir}")
 
-    # =============================================================================
-    # Load the noise-ceiling-normalized encoding accuracy for all NSD subjects
-    # =============================================================================
-    lh_scores = []
-    rh_scores = []
+    # Load the noise-normalized encoding accuracy (R^2 scores) for the given subject
+    data_dir = os.path.join(output_dir, 'encoding_accuracy',
+                            f'encoding_accuracy_subj{format(sub, "02")}.npy')
 
-    for s in subjects:
-        data_dir = os.path.join(output_dir, 'encoding_accuracy',
-                                'encoding_accuracy_subj' + format(s, '02') + '.npy')
-        data = np.load(data_dir, allow_pickle=True).item()
-        lh_scores.append(data['lh_noise_normalized_encoding'])
-        rh_scores.append(data['rh_noise_normalized_encoding'])
+    if not os.path.exists(data_dir):
+        print(f"Error: Encoding accuracy file not found for Subject {sub}")
+        return
 
-    # =============================================================================
+    data = np.load(data_dir, allow_pickle=True).item()
+
+    # Compute mean R?^2 score for left and right hemispheres
+    lh_mean = np.nanmean(data['lh_noise_normalized_encoding'])  # Left hemisphere mean R^2
+    rh_mean = np.nanmean(data['rh_noise_normalized_encoding'])  # Right hemisphere mean R^2
+
+    # Compute standard deviation (for variability visualization)
+    lh_std = np.nanstd(data['lh_noise_normalized_encoding'])
+    rh_std = np.nanstd(data['rh_noise_normalized_encoding'])
+
+    # Create the bar plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+    x_labels = ['Left Hemisphere', 'Right Hemisphere']
+    x_pos = np.arange(len(x_labels))
+    bar_width = 0.5
+
+    ax.bar(x_pos, [lh_mean, rh_mean], yerr=[lh_std, rh_std], width=bar_width,
+           color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean R² Score")
+
+    # Labels and title
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(x_labels)
+    ax.set_ylabel("Mean Noise-normalized $R^2$")
+    ax.set_title(f"Encoding Accuracy (Noise-normalized $R^2$) for Subject {sub}")
+    ax.set_ylim(0, 100)
+    ax.grid(axis='y', linestyle='--', alpha=0.5)
+
+    # Save the plot
+    save_dir = os.path.join(output_dir, 'accuracy_barplot')
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+
+    plot_path = os.path.join(save_dir, f'encoding_accuracy_subj{format(sub, "02")}_barplot.png')
+    plt.savefig(plot_path)
+    print(f"Plot saved at: {plot_path}")
+
+# ======================================================================================================
+# Algorithm to plot the encoding model R^2 accuracy score for each ROI in fsavarage space
+# ======================================================================================================
+
+def baseline_encoding_accuracy_plot_fsavarage(sub, project_dir, output_dir):
+    """
+    Plots the encoding accuracy for each ROI in fsavarage space
+    :param sub: The subject for which the results will be plotted
+    :param project_dir: The project directory
+    :param output_dir: The project outputs directory
+    :return:
+    """
+
+    print(f'>>> Encoding Accuracy Barplot (fsaverage) for Subject {sub} <<<')
+
+    # Load the noise-ceiling-normalized encoding accuracy
+    data_dir = os.path.join(output_dir, 'encoding_accuracy', f'encoding_accuracy_subj{sub:02}.npy')
+    data = np.load(data_dir, allow_pickle=True).item()
+    lh_scores = data['lh_noise_normalized_encoding']
+    rh_scores = data['rh_noise_normalized_encoding']
+
     # Map the data to fsaverage space
-    # =============================================================================
-    lh_fsaverage = []
-    rh_fsaverage = []
-    for s, sub in enumerate(subjects):
-        # Left hemisphere
-        lh_mask_dir = os.path.join(project_dir, 'Dataset', 'train_data', 'subj' +
-                                   format(sub, '02'), 'roi_masks', 'lh.all-vertices_fsaverage_space.npy')
-        lh_fsaverage_nsd_general_plus = np.load(lh_mask_dir)
-        lh_fsavg = np.empty((len(lh_fsaverage_nsd_general_plus)))
-        lh_fsavg[:] = np.nan
-        lh_fsavg[np.where(lh_fsaverage_nsd_general_plus)[0]] = lh_scores[s]
-        lh_fsaverage.append(copy(lh_fsavg))
-        # Right hemisphere
-        rh_mask_dir = os.path.join(project_dir, 'Dataset', 'train_data', 'subj' +
-                                   format(sub, '02'), 'roi_masks', 'rh.all-vertices_fsaverage_space.npy')
-        rh_fsaverage_nsd_general_plus = np.load(rh_mask_dir)
-        rh_fsavg = np.empty((len(rh_fsaverage_nsd_general_plus)))
-        rh_fsavg[:] = np.nan
-        rh_fsavg[np.where(rh_fsaverage_nsd_general_plus)[0]] = rh_scores[s]
-        rh_fsaverage.append(copy(rh_fsavg))
+    lh_mask_dir = os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}', 'roi_masks',
+                               'lh.all-vertices_fsaverage_space.npy')
+    rh_mask_dir = os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}', 'roi_masks',
+                               'rh.all-vertices_fsaverage_space.npy')
 
-    # Average the scores across subjects
-    lh_fsaverage = np.nanmean(lh_fsaverage, 0)
-    rh_fsaverage = np.nanmean(rh_fsaverage, 0)
+    lh_fsaverage_nsd_general_plus = np.load(lh_mask_dir)
+    rh_fsaverage_nsd_general_plus = np.load(rh_mask_dir)
 
-    # =============================================================================
-    # Plot parameters for colorbar
-    # =============================================================================
-    plt.rc('xtick', labelsize=19)
-    plt.rc('ytick', labelsize=19)
+    lh_fsavg = np.empty(len(lh_fsaverage_nsd_general_plus))
+    rh_fsavg = np.empty(len(rh_fsaverage_nsd_general_plus))
+    lh_fsavg[:] = np.nan
+    rh_fsavg[:] = np.nan
 
-    # =============================================================================
-    # Plot the results on brain surfaces
-    # =============================================================================
-    subject = 'fsaverage'
-    data = np.append(lh_fsaverage, rh_fsaverage)
-    vertex_data = cortex.Vertex(data, subject, cmap='hot', vmin=0, vmax=100)
-    cortex.quickshow(vertex_data)
-    plt.show()
-    manager = plt.get_current_fig_manager()
-    manager.window.showMaximized()
-    # plt.savefig('algonauts_2023_challenge_winner_1.png', transparent=True, dpi=100)
+    lh_fsavg[np.where(lh_fsaverage_nsd_general_plus)[0]] = lh_scores
+    rh_fsavg[np.where(rh_fsaverage_nsd_general_plus)[0]] = rh_scores
 
-    # =============================================================================
-    # Plot the fsaverage surface templates
-    # =============================================================================
-    # Plot the full surface
-    data = np.append(lh_fsaverage, rh_fsaverage)
-    data[:] = np.nan  # 40
-    vertex_data = cortex.Vertex(data, subject, cmap='Greys', vmin=0, vmax=100,
-                                with_colorbar=False)
-    cortex.quickshow(vertex_data, with_curvature=True, with_colorbar=False)
-    plt.show()
-    # plt.savefig('algonauts_2023_full_surface_template.png', transparent=True, dpi=100)
+    # Load the ROI mappings
+    roi_mapping_files = ['mapping_prf-visualrois.npy', 'mapping_floc-bodies.npy',
+                         'mapping_floc-faces.npy', 'mapping_floc-places.npy',
+                         'mapping_floc-words.npy', 'mapping_streams.npy']
+    roi_name_maps = []
+    for r in roi_mapping_files:
+        roi_name_maps.append(np.load(os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}',
+                                                  'roi_masks', r), allow_pickle=True).item())
 
-    # Plot the challenge vertices surface --> ['PiYG', 'RdPu_r']
-    data = np.append(lh_fsaverage, rh_fsaverage)
-    idx = ~np.isnan(data)
-    data[idx] = 5
-    vertex_data = cortex.Vertex(data, subject, cmap='PiYG', vmin=0, vmax=100)
-    cortex.quickshow(vertex_data, with_colorbar=False)
-    plt.show()
-    # plt.savefig('algonauts_2023_challenge_vertices_surface.png', transparent=True, dpi=100)
+    # Load the ROI masks in fsaverage space
+    lh_challenge_roi_files = ['lh.prf-visualrois_fsaverage_space.npy',
+                              'lh.floc-bodies_fsaverage_space.npy', 'lh.floc-faces_fsaverage_space.npy',
+                              'lh.floc-places_fsaverage_space.npy', 'lh.floc-words_fsaverage_space.npy',
+                              'lh.streams_fsaverage_space.npy']
+    rh_challenge_roi_files = ['rh.prf-visualrois_fsaverage_space.npy',
+                              'rh.floc-bodies_fsaverage_space.npy', 'rh.floc-faces_fsaverage_space.npy',
+                              'rh.floc-places_fsaverage_space.npy', 'rh.floc-words_fsaverage_space.npy',
+                              'rh.streams_fsaverage_space.npy']
+
+    lh_challenge_rois = [np.load(os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}',
+                                              'roi_masks', f)) for f in lh_challenge_roi_files]
+    rh_challenge_rois = [np.load(os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}',
+                                              'roi_masks', f)) for f in rh_challenge_roi_files]
+
+    # Compute mean R^2 scores for each ROI
+    roi_names = []
+    lh_roi_scores = []
+    rh_roi_scores = []
+    for r1 in range(len(lh_challenge_rois)):
+        for r2 in roi_name_maps[r1].items():
+            if r2[0] != 0:
+                roi_names.append(r2[1])
+                lh_roi_idx = np.where(lh_challenge_rois[r1] == r2[0])[0]
+                rh_roi_idx = np.where(rh_challenge_rois[r1] == r2[0])[0]
+                lh_roi_scores.append(lh_fsavg[lh_roi_idx])
+                rh_roi_scores.append(rh_fsavg[rh_roi_idx])
+
+    # Add an "All vertices" category
+    roi_names.append('All vertices')
+    lh_roi_scores.append(lh_fsavg)
+    rh_roi_scores.append(rh_fsavg)
+
+    # Compute mean R^2 scores for plotting
+    lh_mean_roi_scores = [np.nanmean(lh_roi_scores[r]) for r in range(len(lh_roi_scores))]
+    rh_mean_roi_scores = [np.nanmean(rh_roi_scores[r]) for r in range(len(rh_roi_scores))]
+
+    # Create the bar plot
+    plt.figure(figsize=(18, 10))
+    plt.title(f'Noise-Ceiling-Normalized R² Scores for Subject {sub} (fsaverage)')
+    x = np.arange(len(roi_names))
+    width = 0.30
+    plt.bar(x - width / 2, lh_mean_roi_scores, width, label='Left Hemisphere')
+    plt.bar(x + width / 2, rh_mean_roi_scores, width, label='Right Hemisphere')
+    plt.xlim(left=min(x) - .5, right=max(x) + .5)
+    plt.ylim(bottom=0, top=100)
+    plt.xlabel('ROIs')
+    plt.xticks(ticks=x, labels=roi_names, rotation=60)
+    plt.ylabel('Mean $R^2$ Score (%)')
+    plt.legend(frameon=True, loc=1)
+
+    # Save the plot
+    save_dir = os.path.join(output_dir, 'fsaverage_accuracy_barplot')
+    if os.path.isdir(save_dir) == False:
+        os.makedirs(save_dir)
+    plt.savefig(os.path.join(save_dir, f'subj{sub:02}_fsaverage_r2_barplot.png'))
+
+# =========================================================================================================
+# Algorithm that creates a barplot of the pearson correlation of the model for both hemispheres in each ROI
+# =========================================================================================================
+
+def baseline_encoding_plot_roi_correlation(sub, project_dir, output_dir, model_correlations):
+    """
+    Plots the pearson correlation of the model results for each ROI for both hemispheres
+    :param sub: The subject for which the results will be plotted
+    :param project_dir: The project directory
+    :param output_dir: The project outputs directory
+    :param model_correlations: A dictionary with the model pearson correlation index for both hemispheres
+    :return:
+    """
+
+    # Load the ROI classes mapping dictionaries
+    roi_mapping_files = ['mapping_prf-visualrois.npy', 'mapping_floc-bodies.npy',
+                         'mapping_floc-faces.npy', 'mapping_floc-places.npy',
+                         'mapping_floc-words.npy', 'mapping_streams.npy']
+    roi_name_maps = []
+    for r in roi_mapping_files:
+        roi_name_maps.append(np.load(os.path.join(project_dir, 'Dataset', 'train_data', 'subj' + format(sub, '02'),
+                                                  'roi_masks', r),allow_pickle=True).item())
+    # Load the ROI brain surface maps
+    lh_challenge_roi_files = ['lh.prf-visualrois_challenge_space.npy',
+                              'lh.floc-bodies_challenge_space.npy', 'lh.floc-faces_challenge_space.npy',
+                              'lh.floc-places_challenge_space.npy', 'lh.floc-words_challenge_space.npy',
+                              'lh.streams_challenge_space.npy']
+    rh_challenge_roi_files = ['rh.prf-visualrois_challenge_space.npy',
+                              'rh.floc-bodies_challenge_space.npy', 'rh.floc-faces_challenge_space.npy',
+                              'rh.floc-places_challenge_space.npy', 'rh.floc-words_challenge_space.npy',
+                              'rh.streams_challenge_space.npy']
+    lh_challenge_rois = []
+    rh_challenge_rois = []
+    for r in range(len(lh_challenge_roi_files)):
+        lh_challenge_rois.append(np.load(os.path.join(project_dir, 'Dataset', 'train_data', 'subj' + format(sub, '02'),
+                                                      'roi_masks',lh_challenge_roi_files[r])))
+        rh_challenge_rois.append(np.load(os.path.join(project_dir, 'Dataset', 'train_data', 'subj' + format(sub, '02'),
+                                                      'roi_masks', rh_challenge_roi_files[r])))
+
+    lh_correlations = model_correlations['lh_pearson_correlations']
+    rh_correlations = model_correlations['rh_pearson_correlations']
+
+    # Select the correlation results vertices of each ROI
+    roi_names = []
+    lh_roi_correlation = []
+    rh_roi_correlation = []
+    for r1 in range(len(lh_challenge_rois)):
+        for r2 in roi_name_maps[r1].items():
+            if r2[0] != 0:  # zeros indicate to vertices falling outside the ROI of interest
+                roi_names.append(r2[1])
+                lh_roi_idx = np.where(lh_challenge_rois[r1] == r2[0])[0]
+                rh_roi_idx = np.where(rh_challenge_rois[r1] == r2[0])[0]
+                lh_roi_correlation.append(lh_correlations[lh_roi_idx])
+                rh_roi_correlation.append(rh_correlations[rh_roi_idx])
+    roi_names.append('All vertices')
+    lh_roi_correlation.append(lh_correlations)
+    rh_roi_correlation.append(rh_correlations)
+
+    # Create the plot
+    lh_mean_roi_correlation = [np.mean(lh_roi_correlation[r])
+                               for r in range(len(lh_roi_correlation))]
+    rh_mean_roi_correlation = [np.mean(rh_roi_correlation[r])
+                               for r in range(len(rh_roi_correlation))]
+    plt.figure(figsize=(18, 10))
+    plt.title(f'Model pearson correlation on each ROI for subject {sub}' )
+    x = np.arange(len(roi_names))
+    width = 0.30
+    plt.bar(x - width / 2, lh_mean_roi_correlation, width, label='Left Hemisphere')
+    plt.bar(x + width / 2, rh_mean_roi_correlation, width,
+            label='Right Hemishpere')
+    plt.xlim(left=min(x) - .5, right=max(x) + .5)
+    plt.ylim(bottom=0, top=1)
+    plt.xlabel('ROIs')
+    plt.xticks(ticks=x, labels=roi_names, rotation=60)
+    plt.ylabel('Mean Pearson\'s $r$')
+    plt.legend(frameon=True, loc=1)
+    save_dir = os.path.join(output_dir,'baseline_encoding_model', 'correlation_barplot')
+    if os.path.isdir(save_dir) == False:
+        os.makedirs(save_dir)
+    plt.savefig(os.path.join(save_dir, 'subj' + format(sub, '02') + '_model_pearson_correlation.png'))
+
+
+
+
