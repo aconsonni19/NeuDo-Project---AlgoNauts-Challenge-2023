@@ -9,13 +9,10 @@ project_dir_dir : str
     Project directory.
 
 """
-
-import argparse
 import gc
 import glob
 import random
-import sys
-from copy import copy
+
 
 import joblib
 from matplotlib import pyplot as plt
@@ -196,7 +193,6 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     joblib.dump(sc, os.path.join(Scaler_model_save_dir, 'scaler_subj_' + format(sub, '02') + '.pkl'))
 
     # Applying Principal Component Analysis on the processed image batches
-    n_components = 100  # Reduce dimensionality to 100 components
     pca = IncrementalPCA(n_components= 100) #
 
     print("Applying PCA to all training batches...")
@@ -221,7 +217,7 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     for batch_file in tqdm(fmaps_train):
         batch_data = np.load(batch_file) # Load batch data
         batch_data = sc.transform(batch_data) # Standardize batch using the scaler computer previously
-        batch_data_pca = pca.transform(batch_data) # Apply PCA to reduce dimensionality to 100 components
+        batch_data_pca = pca.transform(batch_data) # Apply PCA to reduce dimensionality to 1000 components
         np.save(os.path.join(save_dir, f'train_data_batch_features_pca_{i}'), batch_data_pca) # Save data
         i += 1
     del fmaps_train # Free computing resources
@@ -241,9 +237,9 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
 
     i = 0
     for batch_file in tqdm(fmaps_test):
-        batch_data = np.load(batch_file)
-        batch_data = sc.transform(batch_data)  # Standardize Batch
-        batch_data_pca = pca.transform(batch_data)  # Apply PCA
+        batch_data = np.load(batch_file)  # Load batch data
+        batch_data = sc.transform(batch_data)  # Standardize batch using the scaler computer previously
+        batch_data_pca = pca.transform(batch_data)  # Apply PCA to reduce dimensionality to 1000 components
         np.save(os.path.join(save_dir, f'test_data_batch_features_pca_{i}'), batch_data_pca)
         i += 1
     del fmaps_test  # Free computing resources
@@ -260,8 +256,6 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
     :param output_dir: The project Output directory, where the Outputs of the model are contained
     :return:
     """
-
-
     print('>>> Algonauts 2023 train encoding <<<')
     print('\nInput arguments:')
     print(f'\n Using subject: {sub}')
@@ -482,21 +476,21 @@ def baseline_encoding_accuracy_plot(sub, project_dir, output_dir):
     rh_std = np.nanstd(data['rh_noise_normalized_encoding'])
 
     # Create the bar plot
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, plot = plt.subplots(figsize=(8, 6))
     x_labels = ['Left Hemisphere', 'Right Hemisphere']
     x_pos = np.arange(len(x_labels))
     bar_width = 0.5
 
-    ax.bar(x_pos, [lh_mean, rh_mean], yerr=[lh_std, rh_std], width=bar_width,
+    plot.bar(x_pos, [lh_mean, rh_mean], yerr=[lh_std, rh_std], width=bar_width,
            color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean R² Score")
 
     # Labels and title
-    ax.set_xticks(x_pos)
-    ax.set_xticklabels(x_labels)
-    ax.set_ylabel("Mean Noise-normalized $R^2$")
-    ax.set_title(f"Encoding Accuracy (Noise-normalized $R^2$) for Subject {sub}")
-    ax.set_ylim(0, 100)
-    ax.grid(axis='y', linestyle='--', alpha=0.5)
+    plot.set_xticks(x_pos)
+    plot.set_xticklabels(x_labels)
+    plot.set_ylabel("Mean Noise-normalized $R^2$")
+    plot.set_title(f"Encoding Accuracy (Noise-normalized $R^2$) for Subject {sub}")
+    plot.set_ylim(0, 100)
+    plot.grid(axis='y', linestyle='--', alpha=0.5)
 
     # Save the plot
     save_dir = os.path.join(output_dir, 'accuracy_barplot')
@@ -593,7 +587,7 @@ def baseline_encoding_accuracy_plot_fsavarage(sub, project_dir, output_dir):
 
     # Create the bar plot
     plt.figure(figsize=(18, 10))
-    plt.title(f'Noise-Ceiling-Normalized R² Scores for Subject {sub} (fsaverage)')
+    plt.title(f'Noise-Ceiling-Normalized $R^2$ Scores for Subject {sub} (fsaverage)')
     x = np.arange(len(roi_names))
     width = 0.30
     plt.bar(x - width / 2, lh_mean_roi_scores, width, label='Left Hemisphere')
