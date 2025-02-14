@@ -47,14 +47,14 @@ def get_all_available_mlp(input_dim=512, output_dim=39548):
     This prevents memory allocation for all models at once.
     """
     model_configs = [
-        ("Base MLP", [1024, 2048, 4096], 0.00, False),
-        ("Base MLP Batch Normalized", [1024, 2048, 4096], 0.00, True),
-        ("Deep MLP", [1024, 2048, 4096, 2048, 1024], 0.00, False),
-        ("Dropout Regularized MLP", [1024, 2048, 4096], 0.5, False),
-        ("Batch Normalized Shallow MLP", [1024, 2048], 0.01, True),
-        ("Batch and Dropout Normalized MLP", [1024, 2048], 0.5, True),
-        # ("Leaky ReLU MLP", [1024, 2048, 4096], 0.4, False, nn.LeakyReLU),
-        ("GELU MLP", [1024, 2048, 4096], 0.4, False, nn.GELU)
+        ("Base MLP", [512, 1024, 2048], 0.00, False),
+        ("Base MLP Batch Normalized", [512, 1024, 2048], 0.00, True),
+        ("Deep MLP", [512, 1024, 2048, 1024, 512], 0.00, False),
+        ("Dropout Regularized MLP", [512, 1024, 2048], 0.5, False),
+        ("Batch Normalized Shallow MLP", [512, 1024], 0.01, True),
+        ("Batch and Dropout Normalized MLP", [512, 1024, 2048], 0.5, True),
+        ("Leaky ReLU MLP", [512, 1024, 2048], 0.4, False, nn.LeakyReLU),
+        ("GELU MLP", [512, 1024, 2048], 0.4, False, nn.GELU)
     ]
 
     for config in model_configs:
