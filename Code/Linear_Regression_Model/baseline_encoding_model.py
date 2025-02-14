@@ -37,36 +37,37 @@ from scipy.stats import pearsonr
 
 class AlexNet(nn.Module):
     def __init__(self):
-        """Select the desired layers and create the model."""
+        # Initialization of the model
         super(AlexNet, self).__init__()
-        self.select_cov = ['maxpool1', 'maxpool2', 'ReLU3', 'ReLU4', 'maxpool5']
-        self.select_fully_connected = ['ReLU6' , 'ReLU7', 'fc8']
-        self.feat_list = self.select_cov + self.select_fully_connected
+        self.select_cov = ['maxpool1', 'maxpool2', 'ReLU3', 'ReLU4', 'maxpool5'] # Selected convolutional layers
+        self.select_fully_connected = ['ReLU6' , 'ReLU7', 'fc8'] # Selected fully connected layers
+        self.feat_list = self.select_cov + self.select_fully_connected # Combine lists with selected layers
+        # Load pre-trained AlexNet model and extract feature and classifier components
         self.alex_feats = models.alexnet(pretrained=True).features
         self.alex_classifier = models.alexnet(pretrained=True).classifier
+        # Adaptive pooling layer to maintain feature map size consistency
         self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
 
     def forward(self, x):
-        """Extract the feature maps."""
-        # =============================================================================
-        # Select the layers of interest and import the model
-        # =============================================================================
         # Lists of AlexNet convolutional and fully connected layers
         conv_layers = ['conv1', 'ReLU1', 'maxpool1', 'conv2', 'ReLU2', 'maxpool2',
                        'conv3', 'ReLU3', 'conv4', 'ReLU4', 'conv5', 'ReLU5', 'maxpool5']
         fully_connected_layers = ['Dropout6', 'fc6', 'ReLU6', 'Dropout7', 'fc7',
                                   'ReLU7', 'fc8']
-        features = []
+        features = [] # List where the features willb e stored
+        # Pass the input through the convolutional layers of the model
         for name, layer in self.alex_feats._modules.items():
-            x = layer(x)
-            if conv_layers[int(name)] in self.feat_list:
-                features.append(x)
+            x = layer(x) # Apply layer transformation
+            if conv_layers[int(name)] in self.feat_list: # Check if the layer is in the selected layers for the model
+                features.append(x) # Append the transformed feature
+        # Apply adaptive average pooling
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
+        # Pass the input through the convolutional layers of the model
         for name, layer in self.alex_classifier._modules.items():
-            x = layer(x)
-            if fully_connected_layers[int(name)] in self.feat_list:
-                features.append(x)
+            x = layer(x) # Apply layer transformation
+            if fully_connected_layers[int(name)] in self.feat_list: # Check if the layer is in the selected layers for the model
+                features.append(x) # Append the transformed feature
         return features
 
 # =============================================================================
@@ -103,25 +104,24 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     random.seed(seed)
     torch.use_deterministic_algorithms(True)
 
+    # Load module
     model = AlexNet()
-    if torch.cuda.is_available():
+    if torch.cuda.is_available(): # If the host has a CUDA device, load the model on the GPU
         model.cuda()
-    model.eval()
+    model.eval() # Set the model to evaluation mode
 
-    # Define the image preprocessing
+    # Define the image preprocessing pipeline
     centre_crop = trn.Compose([
         trn.Resize((224,224)),
         trn.ToTensor(),
         trn.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-
     # =============================================================================
     # Load the images and extract the corresponding feature maps
     # =============================================================================
     # Extract the feature maps of (1) training images and (2) test images
-
-    # Image directories
+    # Initialize image directories
     img_set_dir = os.path.join(project_dir, 'Dataset')
     splits_parent = ['train_data', 'test_data']
     splits = ['training_split', 'test_split']
@@ -131,10 +131,14 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     batch_size = 1024
     batch_files = [fmaps_train, fmaps_test]
 
+    # Loop on both training and test split
     for s in range(len(splits_parent)):
-        image_list = os.listdir(os.path.join(img_set_dir, splits_parent[s], 'subj' +
-                                             format(sub, '02'), splits[s], splits_child[s]))
-        image_list.sort()
+        # Get the images inside a directory
+        image_list = os.listdir(os.path.join(img_set_dir,
+                                             splits_parent[s],
+                                             'subj' + format(sub, '02'),
+                                             splits[s], splits_child[s]))
+        image_list.sort() # Sort them
         print("Extracting features from " + splits_parent[s] + f' in batches of {batch_size}')
 
         # Extract the feature maps from batch:
@@ -142,13 +146,19 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
             batch_images = image_list[i:i + batch_size] # Extract a subset of batch_size images
             batch_features = [] # List that will contain the batch images features
 
-            for image in tqdm(batch_images): # Extraction of features
-                img = Image.open(os.path.join(img_set_dir, splits_parent[s], 'subj' +
-                                              format(sub, '02'), splits[s], splits_child[s],
-                                              image)).convert('RGB') #Open image
-                input_img = V(centre_crop(img).unsqueeze(0)) # Crop image to center and adds dimension for batch
-                                                             # processing
-                if torch.cuda.is_available(): # Moves image to GPU for processing
+            # Extraction of features
+            for image in tqdm(batch_images):
+                # Open the image
+                img = Image.open(os.path.join(img_set_dir,
+                                              splits_parent[s],
+                                              'subj' + format(sub, '02'),
+                                              splits[s],
+                                              splits_child[s],
+                                              image)).convert('RGB')
+                # Crop image to center (preprocessing) and add dimension for batch processing
+                input_img = V(centre_crop(img).unsqueeze(0))
+                # Moves image to GPU for processing if a CUDA device is available
+                if torch.cuda.is_available():
                     input_img = input_img.cuda()
                 x = model.forward(input_img)
 
@@ -193,7 +203,7 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     joblib.dump(sc, os.path.join(Scaler_model_save_dir, 'scaler_subj_' + format(sub, '02') + '.pkl'))
 
     # Applying Principal Component Analysis on the processed image batches
-    pca = IncrementalPCA(n_components= 100) #
+    pca = IncrementalPCA(n_components= 100)
 
     print("Applying PCA to all training batches...")
     for batch_file in tqdm(fmaps_train):
@@ -212,6 +222,7 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     if os.path.isdir(save_dir) == False:
         os.makedirs(save_dir)
 
+    # Save the downsampled features batches
     print("Saving downsampled features...")
     i = 0 # Initialize counter
     for batch_file in tqdm(fmaps_train):
@@ -221,7 +232,6 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
         np.save(os.path.join(save_dir, f'train_data_batch_features_pca_{i}'), batch_data_pca) # Save data
         i += 1
     del fmaps_train # Free computing resources
-
 
     # =============================================================================
     # Apply PCA on the test images feature maps
@@ -321,8 +331,7 @@ def baseline_encoding_train_encoding_model(sub, project_dir, output_dir):
 
     # Save the synthetic fMRI test data
     save_dir = os.path.join(baseline_encoding_dir, 'synthetic_data', 'subj' + format(sub, '02'))
-    if os.path.isdir(save_dir) == False:
-        os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok= True)
     np.save(os.path.join(save_dir, 'lh_test_synthetic_fmri.npy'), synt_test_lh)
     np.save(os.path.join(save_dir, 'rh_test_synthetic_fmri.npy'), synt_test_rh)
 
@@ -366,9 +375,8 @@ def baseline_encoding_test_model(sub, project_dir, output_dir):
     lh_correlation = np.zeros(lh_bio_test.shape[1])
     for v in tqdm(range(lh_bio_test.shape[1])):
         lh_correlation[v] = pearsonr(lh_bio_test[:, v], lh_synt_test[:, v])[0]
-
-    tqdm.write("\nCalculating the pearson correlation coefficient between RH synthetic data and RH biological data")
     # Right hemishpere
+    tqdm.write("\nCalculating the pearson correlation coefficient between RH synthetic data and RH biological data")
     rh_correlation = np.zeros(rh_bio_test.shape[1])
     for v in tqdm(range(rh_bio_test.shape[1])):
         rh_correlation[v] = pearsonr(rh_bio_test[:, v], rh_synt_test[:, v])[0]
@@ -467,7 +475,7 @@ def baseline_encoding_accuracy_plot(sub, project_dir, output_dir):
 
     data = np.load(data_dir, allow_pickle=True).item()
 
-    # Compute mean R?^2 score for left and right hemispheres
+    # Compute mean R^2 score for left and right hemispheres
     lh_mean = np.nanmean(data['lh_noise_normalized_encoding'])  # Left hemisphere mean R^2
     rh_mean = np.nanmean(data['rh_noise_normalized_encoding'])  # Right hemisphere mean R^2
 
@@ -481,10 +489,11 @@ def baseline_encoding_accuracy_plot(sub, project_dir, output_dir):
     x_pos = np.arange(len(x_labels))
     bar_width = 0.5
 
+    # Bars of the plot
     plot.bar(x_pos, [lh_mean, rh_mean], yerr=[lh_std, rh_std], width=bar_width,
-           color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean R² Score")
+           color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean $R^2$ Score")
 
-    # Labels and title
+    # Labels, title and axis definition
     plot.set_xticks(x_pos)
     plot.set_xticklabels(x_labels)
     plot.set_ylabel("Mean Noise-normalized $R^2$")
@@ -494,9 +503,7 @@ def baseline_encoding_accuracy_plot(sub, project_dir, output_dir):
 
     # Save the plot
     save_dir = os.path.join(output_dir, 'accuracy_barplot')
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
-
+    os.makedirs(save_dir, exist_ok=True)
     plot_path = os.path.join(save_dir, f'encoding_accuracy_subj{format(sub, "02")}_barplot.png')
     plt.savefig(plot_path)
     print(f"Plot saved at: {plot_path}")
@@ -528,6 +535,7 @@ def baseline_encoding_accuracy_plot_fsavarage(sub, project_dir, output_dir):
     rh_mask_dir = os.path.join(project_dir, 'Dataset', 'train_data', f'subj{sub:02}', 'roi_masks',
                                'rh.all-vertices_fsaverage_space.npy')
 
+    # Load the R correltaion
     lh_fsaverage_nsd_general_plus = np.load(lh_mask_dir)
     rh_fsaverage_nsd_general_plus = np.load(rh_mask_dir)
 
