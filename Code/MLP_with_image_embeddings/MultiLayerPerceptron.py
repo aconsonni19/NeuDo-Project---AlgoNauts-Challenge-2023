@@ -1,5 +1,7 @@
 import torch.nn as nn
-
+# ===================================================================================
+# Base MLP class
+# ===================================================================================
 class BrainResponseMLP(nn.Module):
     def __init__(self, name, input_dim=512, hidden_dims=[1024, 2048, 4096], output_dim=39548, dropout=0.2,
                  batch_norm=True, activation=nn.ReLU):
@@ -36,9 +38,9 @@ class BrainResponseMLP(nn.Module):
                 prev_x = x
         return self.output_layer(x)
 
-# =====================================
-# ✅ Adjusted `get_all_available_mlp`
-# =====================================
+# ===================================================================================
+# Functions that return all available MLP configurations
+# ===================================================================================
 def get_all_available_mlp(input_dim=512, output_dim=39548):
     """
     Generator function to create and return MLP models one at a time.
@@ -51,7 +53,7 @@ def get_all_available_mlp(input_dim=512, output_dim=39548):
         ("Dropout Regularized MLP", [1024, 2048, 4096], 0.5, False),
         ("Batch Normalized Shallow MLP", [1024, 2048], 0.01, True),
         ("Batch and Dropout Normalized MLP", [1024, 2048], 0.5, True),
-        ("Leaky ReLU MLP", [1024, 2048, 4096], 0.4, False, nn.LeakyReLU),
+        # ("Leaky ReLU MLP", [1024, 2048, 4096], 0.4, False, nn.LeakyReLU),
         ("GELU MLP", [1024, 2048, 4096], 0.4, False, nn.GELU)
     ]
 
