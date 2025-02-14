@@ -131,7 +131,7 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
     batch_size = 1024
     batch_files = [fmaps_train, fmaps_test]
 
-    # Loop on both training and test split
+    # Loop on both training and test split of the dataset
     for s in range(len(splits_parent)):
         # Get the images inside a directory
         image_list = os.listdir(os.path.join(img_set_dir,
@@ -145,7 +145,6 @@ def baseline_encoding_extract_features(sub, project_dir, output_dir):
         for i in range(0, len(image_list), batch_size):
             batch_images = image_list[i:i + batch_size] # Extract a subset of batch_size images
             batch_features = [] # List that will contain the batch images features
-
             # Extraction of features
             for image in tqdm(batch_images):
                 # Open the image

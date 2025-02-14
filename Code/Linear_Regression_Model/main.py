@@ -31,9 +31,9 @@ def use_algonauts_model(project_dir, output_dir):
     os.makedirs(local_baseline_encoding_dir, exist_ok=True)
     for sub in subjects:
         # Extract features
-        baseline_encoding_extract_features(sub, project_dir, local_baseline_encoding_dir)
+        # baseline_encoding_extract_features(sub, project_dir, local_baseline_encoding_dir)
         # Train model on both brain hemispheres
-        baseline_encoding_train_encoding_model(sub, project_dir, output_dir)
+        # baseline_encoding_train_encoding_model(sub, project_dir, output_dir)
         # Get the model pearson correlations
         model_correlations = baseline_encoding_test_model(sub, project_dir, local_baseline_encoding_dir)
         # Plot pearson correlation of the results with each ROI
