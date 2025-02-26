@@ -478,7 +478,7 @@ def mlp_accuarcy_plot(sub, project_dir, output_dir):
         bar_width = 0.5
 
         ax.bar(x_pos, [lh_mean, rh_mean], yerr=[lh_std, rh_std], width=bar_width,
-               color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean R² Score")
+               color=['blue', 'red'], alpha=0.7, capsize=5, label="Mean $R^2$ Score")
 
         # Labels and title
         ax.set_xticks(x_pos)
