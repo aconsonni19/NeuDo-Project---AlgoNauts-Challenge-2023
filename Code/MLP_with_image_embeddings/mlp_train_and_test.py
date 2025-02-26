@@ -392,7 +392,7 @@ def test_mlp_encoding(sub, project_dir, output_dirs):
         lh_correlations.append(lh_correlation)
         rh_correlations.append(rh_correlation)
 
-        lh_r2 = lh_correlation ** 2  # Squaring to get R² scores
+        lh_r2 = lh_correlation ** 2  # Squaring to get R^2 scores
         rh_r2 = rh_correlation ** 2
 
         # Handle cases where the noise ceiling is zero (avoid division by zero)
